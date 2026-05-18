@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ 
+  <!-- ============================================================ -->
+  <!-- ✏️  EDIT HERE (optional): Change the browser tab title       -->
+  <!-- ============================================================ -->
+  <title>Time Out</title>
+ 
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=Cinzel:wght@300;400&display=swap" rel="stylesheet" />
+ 
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+    :root {
+      --cream: #F5EFE4;
+      --gold:  #C9A96E;
+    }
+ 
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+ 
+    body {
+      background: #0e0b07;
+      color: var(--cream);
+      font-family: 'Cormorant Garamond', Georgia, serif;
+    }
+ 
+    /* ── Background photo ──────────────────────────────────────── */
+    #bg {
+      position: fixed;
+      inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+    #bg.loaded { opacity: 1; }
+ 
+    /* ── Dark overlay ──────────────────────────────────────────── */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,0.28) 0%,
+        rgba(0,0,0,0.58) 50%,
+        rgba(0,0,0,0.38) 100%
+      );
+    }
+ 
+    /* ── Subtle film grain ─────────────────────────────────────── */
+    #grain {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.045;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+ 
+    /* ── Enter / click-to-begin screen ────────────────────────── */
+    #enter-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: opacity 0.9s ease;
+    }
+    #enter-screen.fade-out { opacity: 0; pointer-events: none; }
+ 
+    .enter-tick {
+      width: 1px;
+      height: 48px;
+      background: var(--gold);
+      opacity: 0.5;
+      margin-bottom: 1.8rem;
+    }
+    .enter-pulse {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(0.6rem, 1.2vw, 0.78rem);
+      font-weight: 300;
+      letter-spacing: 0.46em;
+      text-transform: uppercase;
+      color: var(--cream);
+      animation: breathe 2.8s ease-in-out infinite;
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.4; }
+      50%       { opacity: 0.9; }
+    }
+ 
+    /* ── Quote stage ───────────────────────────────────────────── */
+    #stage {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(2rem, 10vw, 10rem);
+      opacity: 0;
+      transition: opacity 1.5s ease;
+    }
+    #stage.visible { opacity: 1; }
+ 
+    .open-mark {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: clamp(5rem, 14vw, 10rem);
+      line-height: 0.35;
+      color: var(--gold);
+      opacity: 0.45;
+      align-self: flex-start;
+      margin-left: clamp(0rem, 4vw, 4rem);
+      user-select: none;
+    }
+ 
+    #quote-text {
+      font-style: italic;
+      font-weight: 300;
+      font-size: clamp(1.35rem, 3.2vw, 2.75rem);
+      line-height: 1.75;
+      text-align: center;
+      color: var(--cream);
+      max-width: 800px;
+      text-shadow: 0 2px 28px rgba(0,0,0,0.65);
+      letter-spacing: 0.015em;
+      margin: 0.6rem 0 2rem;
+    }
+ 
+    .rule {
+      width: 36px;
+      height: 1px;
+      background: var(--gold);
+      opacity: 0.5;
+      margin-bottom: 1.5rem;
+    }
+ 
+    #quote-author {
+      font-family: 'Cinzel', serif;
+      font-weight: 300;
+      font-size: clamp(0.55rem, 1vw, 0.72rem);
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    #quote-author:not(:empty)::before { content: '— '; }
+ 
+    /* ── Buttons ───────────────────────────────────────────────── */
+    #next-btn {
+      position: fixed;
+      bottom: 2.2rem;
+      right: 2.2rem;
+      z-index: 20;
+      background: none;
+      border: 1px solid rgba(201,169,110,0.35);
+      color: var(--cream);
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.32em;
+      text-transform: uppercase;
+      padding: 0.65rem 1.3rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.7s ease, background 0.3s ease, border-color 0.3s ease;
+    }
+    #next-btn.visible { opacity: 1; }
+    #next-btn:hover   { background: rgba(201,169,110,0.1); border-color: var(--gold); }
+ 
+    #music-btn {
+      position: fixed;
+      bottom: 2.2rem;
+      left: 2.2rem;
+      z-index: 20;
+      background: none;
+      border: none;
+      color: rgba(245,239,228,0.38);
+      font-family: 'Cinzel', serif;
+      font-size: 0.6rem;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      padding: 0.6rem 0.8rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.7s ease, color 0.3s ease;
+    }
+    #music-btn.visible { opacity: 1; }
+    #music-btn:hover   { color: var(--gold); }
+  </style>
+</head>
+<body>
+ 
+  <div id="bg"></div>
+  <div id="overlay"></div>
+  <div id="grain"></div>
+ 
+  <!-- Click-to-begin screen (also triggers audio autoplay) -->
+  <div id="enter-screen">
+    <div class="enter-tick"></div>
+    <div class="enter-pulse">Click anywhere to begin</div>
+  </div>
+ 
+  <!-- Quote display -->
+  <div id="stage">
+    <div class="open-mark">&ldquo;</div>
+    <p id="quote-text"></p>
+    <div class="rule"></div>
+    <p id="quote-author"></p>
+  </div>
+ 
+  <!-- UI buttons (hidden until user clicks enter) -->
+  <button id="next-btn">Next &nbsp;›</button>
+  <button id="music-btn">♪ Music On</button>
+ 
+  <!-- ============================================================ -->
+  <!-- ✏️  EDIT HERE: Replace "melody.mp3" with your audio filename -->
+  <!--     The audio file must sit in the same folder as this file  -->
+  <!-- ============================================================ -->
+  <audio id="bg-music" loop>
+    <source src="sonican-relaxing-background-music-calm-serenity-485747.mp3" type="audio/mpeg" />
+  </audio>
+ 
+  <script>
+    // ============================================================
+    // ✏️  EDIT HERE: Paste your published Google Sheets CSV URL
+    //     between the single quotes below.
+    //     See Step 4 in INSTRUCTIONS.md for how to get this URL.
+    // ============================================================
+    const SHEET_CSV_URL = https://docs.google.com/spreadsheets/d/e/2PACX-1vTMMbDkSmDGnqB9bFW8wOToX8xh3qctbF_HuQhpTc4Zfavi0Dt6JmAZ1LCIN7wLUP7HmVm4PI9PHHGz/pubhtml;
+ 
+ 
+    // ─────────────────────────────────────────────────────────────
+    //  No need to edit anything below this line
+    // ─────────────────────────────────────────────────────────────
+ 
+    const bg          = document.getElementById('bg');
+    const enterScreen = document.getElementById('enter-screen');
+    const stage       = document.getElementById('stage');
+    const quoteText   = document.getElementById('quote-text');
+    const quoteAuthor = document.getElementById('quote-author');
+    const nextBtn     = document.getElementById('next-btn');
+    const musicBtn    = document.getElementById('music-btn');
+    const audio       = document.getElementById('bg-music');
+ 
+    let quotes  = [];
+    let musicOn = false;
+ 
+    // ── CSV parser (safely handles commas inside quoted fields) ──
+    function parseCSV(raw) {
+      const rows  = [];
+      const lines = raw.split(/\r?\n/);
+      for (let i = 1; i < lines.length; i++) {   // row 0 = header, skip it
+        const line = lines[i].trim();
+        if (!line) continue;
+        const cols = [];
+        let field = '', inQ = false;
+        for (let c = 0; c < line.length; c++) {
+          const ch = line[c];
+          if      (ch === '"' && line[c + 1] === '"') { field += '"'; c++; }
+          else if (ch === '"')                         { inQ = !inQ; }
+          else if (ch === ',' && !inQ)                 { cols.push(field.trim()); field = ''; }
+          else                                         { field += ch; }
+        }
+        cols.push(field.trim());
+        if (cols[0]) rows.push({ quote: cols[0], author: cols[1] || '' });
+      }
+      return rows;
+    }
+ 
+    // ── Load a fresh random background image ─────────────────────
+    function loadBg() {
+      bg.classList.remove('loaded');
+      const img = new Image();
+      const url = `https://picsum.photos/1920/1080?t=${Date.now()}`;
+      img.onload = () => {
+        bg.style.backgroundImage = `url('${url}')`;
+        bg.classList.add('loaded');
+      };
+      img.src = url;
+    }
+ 
+    // ── Fade out then display a random quote ─────────────────────
+    function showQuote() {
+      if (!quotes.length) return;
+      const pick = quotes[Math.floor(Math.random() * quotes.length)];
+      stage.classList.remove('visible');
+      setTimeout(() => {
+        quoteText.textContent   = pick.quote;
+        quoteAuthor.textContent = pick.author;
+        stage.classList.add('visible');
+      }, 600);
+    }
+ 
+    // ── Fetch quotes from the published Google Sheets CSV ─────────
+    async function loadQuotes() {
+      if (SHEET_CSV_URL === 'YOUR_GOOGLE_SHEETS_CSV_URL_HERE') {
+        // Demo quotes shown before a real sheet URL is added
+        quotes = [
+          { quote: 'The only way to do great work is to love what you do.',        author: 'Steve Jobs'            },
+          { quote: 'In the middle of difficulty lies opportunity.',                 author: 'Albert Einstein'       },
+          { quote: 'It always seems impossible until it is done.',                  author: 'Nelson Mandela'        },
+          { quote: 'The journey of a thousand miles begins with one step.',         author: 'Lao Tzu'               },
+          { quote: 'You do not find the happy life. You make it.',                  author: 'Camilla E. Kimball'    },
+        ];
+        showQuote();
+        return;
+      }
+      try {
+        const res  = await fetch(SHEET_CSV_URL);
+        const text = await res.text();
+        quotes = parseCSV(text);
+        if (!quotes.length) throw new Error('No quotes found');
+        showQuote();
+      } catch (err) {
+        quoteText.textContent   = 'Could not load quotes. Double-check the sheet URL in the code.';
+        quoteAuthor.textContent = '';
+        stage.classList.add('visible');
+      }
+    }
+ 
+    // ── Music on / off ────────────────────────────────────────────
+    function setMusic(on) {
+      musicOn = on;
+      if (on) { audio.play().catch(() => {}); musicBtn.textContent = '♪ Music On';  }
+      else    { audio.pause();                musicBtn.textContent = '♪ Music Off'; }
+    }
+ 
+    // ── Enter screen click starts everything ─────────────────────
+    enterScreen.addEventListener('click', () => {
+      enterScreen.classList.add('fade-out');
+      stage.classList.add('visible');
+      nextBtn.classList.add('visible');
+      musicBtn.classList.add('visible');
+      setMusic(true);
+      setTimeout(() => enterScreen.remove(), 1000);
+    });
+ 
+    // ── Next button: new image + new quote ───────────────────────
+    nextBtn.addEventListener('click', () => { loadBg(); showQuote(); });
+ 
+    // ── Music button: toggle ──────────────────────────────────────
+    musicBtn.addEventListener('click', () => setMusic(!musicOn));
+ 
+    // ── Init ──────────────────────────────────────────────────────
+    loadBg();
+    loadQuotes();
+  </script>
+</body>
+</html>
