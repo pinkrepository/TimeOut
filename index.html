@@ -36,7 +36,7 @@
       background-size: cover;
       background-position: center;
       opacity: 0;
-      transition: opacity 1.5s ease;
+      transition: opacity 1.8s ease;
     }
     #bg.loaded { opacity: 1; }
  
@@ -59,41 +59,6 @@
       pointer-events: none;
       opacity: 0.045;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
-    }
- 
-    /* ── Enter / click-to-begin screen ────────────────────────── */
-    #enter-screen {
-      position: fixed;
-      inset: 0;
-      z-index: 100;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: opacity 0.9s ease;
-    }
-    #enter-screen.fade-out { opacity: 0; pointer-events: none; }
- 
-    .enter-tick {
-      width: 1px;
-      height: 48px;
-      background: var(--gold);
-      opacity: 0.5;
-      margin-bottom: 1.8rem;
-    }
-    .enter-pulse {
-      font-family: 'Cinzel', serif;
-      font-size: clamp(0.6rem, 1.2vw, 0.78rem);
-      font-weight: 300;
-      letter-spacing: 0.46em;
-      text-transform: uppercase;
-      color: var(--cream);
-      animation: breathe 2.8s ease-in-out infinite;
-    }
-    @keyframes breathe {
-      0%, 100% { opacity: 0.4; }
-      50%       { opacity: 0.9; }
     }
  
     /* ── Quote stage ───────────────────────────────────────────── */
@@ -174,6 +139,7 @@
     #next-btn.visible { opacity: 1; }
     #next-btn:hover   { background: rgba(201,169,110,0.1); border-color: var(--gold); }
  
+    /* Music button — always visible, shows mute state           */
     #music-btn {
       position: fixed;
       bottom: 2.2rem;
@@ -193,6 +159,25 @@
     }
     #music-btn.visible { opacity: 1; }
     #music-btn:hover   { color: var(--gold); }
+ 
+    /* ── Small "tap to unmute" nudge shown if autoplay blocked ── */
+    #unmute-hint {
+      position: fixed;
+      top: 1.6rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      font-family: 'Cinzel', serif;
+      font-size: 0.58rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--gold);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+      white-space: nowrap;
+    }
+    #unmute-hint.show { opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -200,12 +185,6 @@
   <div id="bg"></div>
   <div id="overlay"></div>
   <div id="grain"></div>
- 
-  <!-- Click-to-begin screen (also triggers audio autoplay) -->
-  <div id="enter-screen">
-    <div class="enter-tick"></div>
-    <div class="enter-pulse">Click anywhere to begin</div>
-  </div>
  
   <!-- Quote display -->
   <div id="stage">
@@ -215,9 +194,12 @@
     <p id="quote-author"></p>
   </div>
  
-  <!-- UI buttons (hidden until user clicks enter) -->
+  <!-- UI buttons -->
   <button id="next-btn">Next &nbsp;›</button>
   <button id="music-btn">♪ Music On</button>
+ 
+  <!-- Gentle nudge if browser blocked autoplay -->
+  <div id="unmute-hint">♪ Click anywhere to unmute</div>
  
   <!-- ============================================================ -->
   <!-- ✏️  EDIT HERE: Replace "melody.mp3" with your audio filename -->
@@ -233,7 +215,7 @@
     //     between the single quotes below.
     //     See Step 4 in INSTRUCTIONS.md for how to get this URL.
     // ============================================================
-    const SHEET_CSV_URL = https://docs.google.com/spreadsheets/d/e/2PACX-1vTMMbDkSmDGnqB9bFW8wOToX8xh3qctbF_HuQhpTc4Zfavi0Dt6JmAZ1LCIN7wLUP7HmVm4PI9PHHGz/pubhtml;
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTMMbDkSmDGnqB9bFW8wOToX8xh3qctbF_HuQhpTc4Zfavi0Dt6JmAZ1LCIN7wLUP7HmVm4PI9PHHGz/pubhtml';
  
  
     // ─────────────────────────────────────────────────────────────
@@ -241,13 +223,13 @@
     // ─────────────────────────────────────────────────────────────
  
     const bg          = document.getElementById('bg');
-    const enterScreen = document.getElementById('enter-screen');
     const stage       = document.getElementById('stage');
     const quoteText   = document.getElementById('quote-text');
     const quoteAuthor = document.getElementById('quote-author');
     const nextBtn     = document.getElementById('next-btn');
     const musicBtn    = document.getElementById('music-btn');
     const audio       = document.getElementById('bg-music');
+    const unmuteHint  = document.getElementById('unmute-hint');
  
     let quotes  = [];
     let musicOn = false;
@@ -256,7 +238,7 @@
     function parseCSV(raw) {
       const rows  = [];
       const lines = raw.split(/\r?\n/);
-      for (let i = 1; i < lines.length; i++) {   // row 0 = header, skip it
+      for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
         if (!line) continue;
         const cols = [];
@@ -301,13 +283,12 @@
     // ── Fetch quotes from the published Google Sheets CSV ─────────
     async function loadQuotes() {
       if (SHEET_CSV_URL === 'YOUR_GOOGLE_SHEETS_CSV_URL_HERE') {
-        // Demo quotes shown before a real sheet URL is added
         quotes = [
-          { quote: 'The only way to do great work is to love what you do.',        author: 'Steve Jobs'            },
-          { quote: 'In the middle of difficulty lies opportunity.',                 author: 'Albert Einstein'       },
-          { quote: 'It always seems impossible until it is done.',                  author: 'Nelson Mandela'        },
-          { quote: 'The journey of a thousand miles begins with one step.',         author: 'Lao Tzu'               },
-          { quote: 'You do not find the happy life. You make it.',                  author: 'Camilla E. Kimball'    },
+          { quote: 'The only way to do great work is to love what you do.',        author: 'Steve Jobs'         },
+          { quote: 'In the middle of difficulty lies opportunity.',                 author: 'Albert Einstein'    },
+          { quote: 'It always seems impossible until it is done.',                  author: 'Nelson Mandela'     },
+          { quote: 'The journey of a thousand miles begins with one step.',         author: 'Lao Tzu'            },
+          { quote: 'You do not find the happy life. You make it.',                  author: 'Camilla E. Kimball' },
         ];
         showQuote();
         return;
@@ -318,39 +299,75 @@
         quotes = parseCSV(text);
         if (!quotes.length) throw new Error('No quotes found');
         showQuote();
-      } catch (err) {
+      } catch {
         quoteText.textContent   = 'Could not load quotes. Double-check the sheet URL in the code.';
         quoteAuthor.textContent = '';
         stage.classList.add('visible');
       }
     }
  
-    // ── Music on / off ────────────────────────────────────────────
+    // ── Music helpers ─────────────────────────────────────────────
     function setMusic(on) {
       musicOn = on;
-      if (on) { audio.play().catch(() => {}); musicBtn.textContent = '♪ Music On';  }
-      else    { audio.pause();                musicBtn.textContent = '♪ Music Off'; }
+      if (on) {
+        audio.play().catch(() => {});
+        musicBtn.textContent = '♪ Music On';
+        unmuteHint.classList.remove('show');
+      } else {
+        audio.pause();
+        musicBtn.textContent = '♪ Music Off';
+      }
     }
  
-    // ── Enter screen click starts everything ─────────────────────
-    enterScreen.addEventListener('click', () => {
-      enterScreen.classList.add('fade-out');
-      stage.classList.add('visible');
-      nextBtn.classList.add('visible');
-      musicBtn.classList.add('visible');
-      setMusic(true);
-      setTimeout(() => enterScreen.remove(), 1000);
+    // ── Attempt autoplay on load ──────────────────────────────────
+    // Browsers allow autoplay only if the user has previously
+    // interacted with the site. On a first visit it will usually
+    // be blocked. We try anyway, and if it fails we show a small
+    // hint at the top of the screen. One click anywhere clears it.
+    function tryAutoplay() {
+      audio.play()
+        .then(() => {
+          musicOn = true;
+          musicBtn.textContent = '♪ Music On';
+        })
+        .catch(() => {
+          // Autoplay was blocked — show the gentle nudge
+          unmuteHint.classList.add('show');
+ 
+          // One click anywhere on the page will unmute
+          function onFirstClick() {
+            setMusic(true);
+            unmuteHint.classList.remove('show');
+            document.removeEventListener('click', onFirstClick);
+          }
+          document.addEventListener('click', onFirstClick);
+        });
+    }
+ 
+    // ── Next button ───────────────────────────────────────────────
+    nextBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // don't also fire the unmute listener
+      loadBg();
+      showQuote();
     });
  
-    // ── Next button: new image + new quote ───────────────────────
-    nextBtn.addEventListener('click', () => { loadBg(); showQuote(); });
- 
-    // ── Music button: toggle ──────────────────────────────────────
-    musicBtn.addEventListener('click', () => setMusic(!musicOn));
+    // ── Music button ──────────────────────────────────────────────
+    musicBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setMusic(!musicOn);
+    });
  
     // ── Init ──────────────────────────────────────────────────────
     loadBg();
     loadQuotes();
+ 
+    // Show buttons after a short delay (feels intentional, not abrupt)
+    setTimeout(() => {
+      stage.classList.add('visible');
+      nextBtn.classList.add('visible');
+      musicBtn.classList.add('visible');
+      tryAutoplay();
+    }, 400);
   </script>
 </body>
 </html>
